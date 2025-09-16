@@ -1,0 +1,821 @@
+<?php
+/**
+ * =====================================================
+ * PICTOTUNE.COM - INSTALLER AUTOMATICO COMPLETO
+ * =====================================================
+ * 
+ * ISTRUZIONI:
+ * 1. Salva questo file come "install_pictotune.php"
+ * 2. Caricalo via FTP nella root di pictotune.com
+ * 3. Apri: https://pictotune.com/install_pictotune.php
+ * 4. Elimina questo file dopo l'installazione!
+ */
+
+// CONFIGURAZIONE GIÀ IMPOSTATA PER PICTOTUNE.COM
+$CONFIG = [
+    'db_host' => 'localhost',
+    'db_name' => 'km616q2x_Sql1234567_1',
+    'db_user' => 'km616q2x_picco',
+    'db_pass' => 'FLstudio2025!',
+    'site_url' => 'https://pictotune.com',
+    'brand_name' => 'PictoTune',
+    'brand_emoji' => '🎶'
+];
+
+echo "<!DOCTYPE html>
+<html>
+<head>
+    <title>PictoTune Installer</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        h1 { 
+            font-size: 48px; 
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .success { 
+            background: rgba(16,185,129,0.2);
+            color: #10b981; 
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #10b981;
+        }
+        .error { 
+            background: rgba(239,68,68,0.2);
+            color: #ef4444; 
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #ef4444;
+        }
+        .warning {
+            background: rgba(245,158,11,0.2);
+            color: #f59e0b;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #f59e0b;
+        }
+        .step {
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px 5px;
+            transition: transform 0.3s;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+        code {
+            background: rgba(0,0,0,0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .logo { font-size: 60px; }
+    </style>
+</head>
+<body>
+    <div class='container'>
+        <h1><span class='logo'>🎶</span> PictoTune Installer</h1>
+        <p style='opacity: 0.8; font-size: 18px;'>Trasforma le tue immagini in musica!</p>
+        <hr style='border: none; border-top: 1px solid rgba(255,255,255,0.2); margin: 30px 0;'>
+";
+
+$errors = [];
+$success = [];
+
+// STEP 1: Verifica PHP
+if (version_compare(PHP_VERSION, '7.4.0', '>=')) {
+    $success[] = "✓ PHP " . PHP_VERSION . " compatibile";
+} else {
+    $errors[] = "PHP 7.4 o superiore richiesto (attuale: " . PHP_VERSION . ")";
+}
+
+// STEP 2: Verifica estensioni
+$required_extensions = ['pdo', 'pdo_mysql', 'json', 'fileinfo'];
+foreach ($required_extensions as $ext) {
+    if (extension_loaded($ext)) {
+        $success[] = "✓ Estensione $ext presente";
+    } else {
+        $errors[] = "Estensione $ext mancante";
+    }
+}
+
+// STEP 3: Crea cartelle
+$dirs = [
+    'api',
+    'admin',
+    'uploads',
+    'audio', 
+    'logs',
+    'assets',
+    'assets/css',
+    'assets/js'
+];
+
+foreach ($dirs as $dir) {
+    if (!file_exists($dir)) {
+        if (mkdir($dir, 0755, true)) {
+            $success[] = "✓ Cartella /$dir creata";
+        } else {
+            $errors[] = "Impossibile creare cartella /$dir";
+        }
+    } else {
+        $success[] = "✓ Cartella /$dir già esistente";
+    }
+}
+
+// STEP 4: Test connessione database
+try {
+    $db = new PDO(
+        "mysql:host={$CONFIG['db_host']};dbname={$CONFIG['db_name']};charset=utf8mb4",
+        $CONFIG['db_user'],
+        $CONFIG['db_pass']
+    );
+    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $success[] = "✓ Connessione database riuscita";
+    
+    // STEP 5: Crea tabelle
+    $tables_sql = [
+        "users" => "CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            username VARCHAR(100) UNIQUE NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            credits INT DEFAULT 10,
+            role ENUM('user', 'admin', 'moderator') DEFAULT 'user',
+            status ENUM('active', 'suspended', 'deleted') DEFAULT 'active',
+            subscription_type ENUM('free', 'starter', 'pro', 'business') DEFAULT 'free',
+            subscription_expires DATETIME NULL,
+            total_generations INT DEFAULT 0,
+            storage_used BIGINT DEFAULT 0,
+            last_active DATETIME NULL,
+            settings JSON,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_email (email),
+            INDEX idx_username (username)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        
+        "generations" => "CREATE TABLE IF NOT EXISTS generations (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            image_original VARCHAR(500),
+            image_thumbnail VARCHAR(500),
+            image_metadata JSON,
+            analysis_mood VARCHAR(100),
+            analysis_colors VARCHAR(500),
+            analysis_style VARCHAR(100),
+            analysis_tempo INT,
+            analysis_data JSON,
+            music_url VARCHAR(500),
+            music_duration INT,
+            music_format VARCHAR(10),
+            music_bitrate VARCHAR(10),
+            music_data JSON,
+            title VARCHAR(255),
+            description TEXT,
+            tags VARCHAR(500),
+            is_public BOOLEAN DEFAULT FALSE,
+            views INT DEFAULT 0,
+            likes INT DEFAULT 0,
+            downloads INT DEFAULT 0,
+            credits_used INT,
+            processing_time INT,
+            status ENUM('pending', 'processing', 'completed', 'failed') DEFAULT 'pending',
+            error_message TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            INDEX idx_user (user_id),
+            INDEX idx_status (status),
+            INDEX idx_created (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        
+        "transactions" => "CREATE TABLE IF NOT EXISTS transactions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            type ENUM('purchase', 'refund', 'bonus', 'subscription') NOT NULL,
+            credits INT,
+            amount DECIMAL(10, 2),
+            currency VARCHAR(3) DEFAULT 'EUR',
+            package_id VARCHAR(100),
+            package_name VARCHAR(255),
+            payment_method VARCHAR(50),
+            transaction_id VARCHAR(255),
+            status ENUM('pending', 'completed', 'failed', 'refunded') DEFAULT 'pending',
+            receipt_url VARCHAR(500),
+            metadata JSON,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            INDEX idx_user (user_id),
+            INDEX idx_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        
+        "credit_packages" => "CREATE TABLE IF NOT EXISTS credit_packages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            credits INT NOT NULL,
+            price DECIMAL(10, 2) NOT NULL,
+            original_price DECIMAL(10, 2),
+            currency VARCHAR(3) DEFAULT 'EUR',
+            features JSON,
+            is_popular BOOLEAN DEFAULT FALSE,
+            is_active BOOLEAN DEFAULT TRUE,
+            gumroad_product_id VARCHAR(255),
+            stripe_product_id VARCHAR(255),
+            sort_order INT DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        
+        "user_sessions" => "CREATE TABLE IF NOT EXISTS user_sessions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            token VARCHAR(500) NOT NULL,
+            ip_address VARCHAR(45),
+            user_agent TEXT,
+            expires_at DATETIME NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            INDEX idx_token (token),
+            INDEX idx_expires (expires_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        
+        "system_settings" => "CREATE TABLE IF NOT EXISTS system_settings (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            setting_key VARCHAR(100) UNIQUE NOT NULL,
+            setting_value TEXT,
+            category VARCHAR(50),
+            description TEXT,
+            updated_by INT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_key (setting_key)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    ];
+    
+    foreach ($tables_sql as $table_name => $sql) {
+        try {
+            $db->exec($sql);
+            $success[] = "✓ Tabella '$table_name' creata/verificata";
+        } catch (PDOException $e) {
+            $errors[] = "Errore tabella '$table_name': " . $e->getMessage();
+        }
+    }
+    
+    // STEP 6: Inserisci dati di default
+    
+    // Pacchetti crediti
+    $stmt = $db->prepare("SELECT COUNT(*) FROM credit_packages");
+    $stmt->execute();
+    if ($stmt->fetchColumn() == 0) {
+        $packages = [
+            ['Starter Pack', 50, 4.99, 9.99, '["5 sonificazioni", "Download illimitati", "Supporto standard"]', 0],
+            ['Pro Pack', 200, 14.99, 19.99, '["20 sonificazioni", "Supporto prioritario", "25% di sconto"]', 1],
+            ['Business Pack', 500, 29.99, 49.99, '["50 sonificazioni", "VIP support", "40% di sconto", "Beta access"]', 0]
+        ];
+        
+        $stmt = $db->prepare("INSERT INTO credit_packages (name, credits, price, original_price, features, is_popular) VALUES (?, ?, ?, ?, ?, ?)");
+        foreach ($packages as $package) {
+            $stmt->execute($package);
+        }
+        $success[] = "✓ Pacchetti crediti inseriti";
+    }
+    
+    // Settings di sistema
+    $stmt = $db->prepare("SELECT COUNT(*) FROM system_settings");
+    $stmt->execute();
+    if ($stmt->fetchColumn() == 0) {
+        $settings = [
+            ['site_name', 'PictoTune', 'general', 'Nome del sito'],
+            ['site_url', 'https://pictotune.com', 'general', 'URL del sito'],
+            ['daily_generation_limit', '1000', 'limits', 'Limite generazioni giornaliere'],
+            ['credits_per_generation', '10', 'generation', 'Crediti per generazione'],
+            ['max_file_size', '10485760', 'uploads', 'Dimensione massima file'],
+            ['maintenance_mode', '0', 'system', 'Modalità manutenzione'],
+            ['default_audio_quality', '320', 'audio', 'Qualità audio default'],
+            ['default_duration', '60', 'audio', 'Durata default in secondi']
+        ];
+        
+        $stmt = $db->prepare("INSERT INTO system_settings (setting_key, setting_value, category, description) VALUES (?, ?, ?, ?)");
+        foreach ($settings as $setting) {
+            $stmt->execute($setting);
+        }
+        $success[] = "✓ Settings di sistema inserite";
+    }
+    
+    // Crea admin di default
+    $stmt = $db->prepare("SELECT COUNT(*) FROM users WHERE role = 'admin'");
+    $stmt->execute();
+    if ($stmt->fetchColumn() == 0) {
+        $admin_password = password_hash('admin123', PASSWORD_DEFAULT);
+        $stmt = $db->prepare("INSERT INTO users (email, username, password, role, credits) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute(['admin@pictotune.com', 'admin', $admin_password, 'admin', 1000]);
+        $success[] = "✓ Account admin creato";
+    }
+    
+} catch (PDOException $e) {
+    $errors[] = "Errore database: " . $e->getMessage();
+}
+
+// STEP 7: Crea file di configurazione
+if (empty($errors)) {
+    
+    // config.php
+    $config_content = '<?php
+define(\'DB_HOST\', \'' . $CONFIG['db_host'] . '\');
+define(\'DB_NAME\', \'' . $CONFIG['db_name'] . '\');
+define(\'DB_USER\', \'' . $CONFIG['db_user'] . '\');
+define(\'DB_PASS\', \'' . str_replace("'", "\\'", $CONFIG['db_pass']) . '\');
+define(\'SITE_URL\', \'' . $CONFIG['site_url'] . '\');
+define(\'SITE_NAME\', \'' . $CONFIG['brand_name'] . '\');
+define(\'UPLOAD_DIR\', __DIR__ . \'/../uploads/\');
+define(\'AUDIO_DIR\', __DIR__ . \'/../audio/\');
+define(\'JWT_SECRET\', \'' . bin2hex(random_bytes(32)) . '\');
+define(\'CREDITS_PER_GENERATION\', 10);
+define(\'MAX_FILE_SIZE\', 10 * 1024 * 1024);
+
+// API Keys (da configurare)
+define(\'STABILITY_API_KEY\', \'\');
+define(\'MUBERT_API_KEY\', \'\');
+define(\'GUMROAD_SECRET\', \'\');
+
+date_default_timezone_set(\'Europe/Rome\');
+error_reporting(E_ALL);
+ini_set(\'display_errors\', 0);
+ini_set(\'log_errors\', 1);
+ini_set(\'error_log\', __DIR__ . \'/../logs/error.log\');';
+    
+    file_put_contents('api/config.php', $config_content);
+    $success[] = "✓ File config.php creato";
+    
+    // .htaccess
+    $htaccess_content = 'RewriteEngine On
+
+# Force HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# API Routing
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/(.*)$ /api/index.php?route=$1 [QSA,L]
+
+# Security
+Options -Indexes
+ServerSignature Off
+
+# Protect sensitive files
+<FilesMatch "\.(env|json|lock|log)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# PHP Settings
+php_value upload_max_filesize 10M
+php_value post_max_size 10M
+php_value max_execution_time 60';
+    
+    file_put_contents('.htaccess', $htaccess_content);
+    $success[] = "✓ File .htaccess creato";
+    
+    // index.php principale
+    $index_content = '<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>' . $CONFIG['brand_name'] . ' - Trasforma le tue immagini in musica</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 40px;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            max-width: 600px;
+        }
+        h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+        .logo { font-size: 60px; }
+        p { font-size: 20px; opacity: 0.9; margin: 20px 0; }
+        .status {
+            background: rgba(16,185,129,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 15px 30px;
+            background: white;
+            color: #667eea;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            margin: 10px;
+            transition: transform 0.3s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><span class="logo">' . $CONFIG['brand_emoji'] . '</span> ' . $CONFIG['brand_name'] . '</h1>
+        <p>Trasforma le tue immagini in musica con l\'intelligenza artificiale</p>
+        <div class="status">
+            ✅ Installazione completata con successo!
+        </div>
+        <p>Il tuo sito è pronto per essere utilizzato</p>
+        <div style="margin-top: 30px;">
+            <a href="/app" class="btn">Vai all\'App</a>
+            <a href="/admin" class="btn">Admin Panel</a>
+        </div>
+        <div style="margin-top: 30px; font-size: 14px; opacity: 0.7;">
+            <p>Credenziali Admin:</p>
+            <p>Email: admin@pictotune.com</p>
+            <p>Password: admin123</p>
+            <p style="color: #f59e0b; margin-top: 10px;">⚠️ Cambia la password dopo il primo accesso!</p>
+        </div>
+    </div>
+</body>
+</html>';
+    
+    file_put_contents('index.php', $index_content);
+    $success[] = "✓ Homepage creata";
+}
+
+// Mostra risultati
+if (!empty($success)) {
+    echo "<div class='step'><h3>✅ Operazioni Completate:</h3>";
+    foreach ($success as $msg) {
+        echo "<div class='success'>$msg</div>";
+    }
+    echo "</div>";
+}
+
+if (!empty($errors)) {
+    echo "<div class='step'><h3>⚠️ Errori Rilevati:</h3>";
+    foreach ($errors as $msg) {
+        echo "<div class='error'>$msg</div>";
+    }
+    echo "</div>";
+}
+
+// Step finali
+if (empty($errors)) {
+    echo "
+    <div class='step' style='background: rgba(16,185,129,0.1); border: 2px solid #10b981;'>
+        <h2 style='color: #10b981;'>🎉 Installazione Completata con Successo!</h2>
+        <p style='margin: 20px 0;'>PictoTune è stato installato correttamente su <strong>pictotune.com</strong></p>
+        
+        <h3 style='margin-top: 30px;'>📋 Prossimi Step:</h3>
+        <ol style='text-align: left; margin: 20px; line-height: 2;'>
+            <li>Elimina questo file installer per sicurezza</li>
+            <li>Testa il login admin: <code>admin@pictotune.com</code> / <code>admin123</code></li>
+            <li>Cambia la password admin dal pannello</li>
+            <li>Configura le API keys nel file <code>/api/config.php</code></li>
+            <li>Personalizza grafica e contenuti</li>
+        </ol>
+        
+        <div style='margin-top: 30px;'>
+            <a href='/' class='button'>🏠 Vai alla Home</a>
+            <a href='/app' class='button'>🎵 Apri App</a>
+            <a href='/admin' class='button'>⚙️ Admin Panel</a>
+        </div>
+    </div>
+    
+    <div class='warning' style='margin-top: 30px;'>
+        <strong>⚠️ SICUREZZA:</strong> Elimina subito questo file installer dal server!<br>
+        Puoi farlo via FTP o con questo comando: <code>rm install_pictotune.php</code>
+    </div>";
+    
+} else {
+    echo "
+    <div class='step' style='background: rgba(239,68,68,0.1); border: 2px solid #ef4444;'>
+        <h2 style='color: #ef4444;'>❌ Installazione Non Completata</h2>
+        <p style='margin: 20px 0;'>Correggi gli errori sopra indicati e riprova.</p>
+        <p>Se hai problemi con il database, verifica:</p>
+        <ul style='text-align: left; margin: 20px;'>
+            <li>Username e password siano corretti</li>
+            <li>Il database esista e sia accessibile</li>
+            <li>L'host sia 'localhost' o l'IP corretto</li>
+            <li>Le tabelle non esistano già con strutture diverse</li>
+        </ul>
+        <a href='javascript:location.reload()' class='button'>🔄 Riprova</a>
+    </div>";
+}
+
+echo "
+    </div>
+</body>
+</html>";
+
+// Se tutto OK, crea anche i file API principali
+if (empty($errors)) {
+    
+    // api/index.php - Router principale
+    $api_router = '<?php
+header("Content-Type: application/json");
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
+if ($_SERVER["REQUEST_METHOD"] == "OPTIONS") {
+    exit(0);
+}
+
+require_once "config.php";
+
+// Router semplice
+$route = $_GET["route"] ?? "";
+$method = $_SERVER["REQUEST_METHOD"];
+$input = json_decode(file_get_contents("php://input"), true);
+
+// Database connection
+try {
+    $db = new PDO(
+        "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
+        DB_USER,
+        DB_PASS
+    );
+    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode(["error" => "Database connection failed"]);
+    exit;
+}
+
+// Routes
+switch ($route) {
+    case "health":
+        echo json_encode([
+            "status" => "ok",
+            "site" => SITE_NAME,
+            "version" => "1.0.0"
+        ]);
+        break;
+        
+    case "auth/login":
+        if ($method !== "POST") {
+            http_response_code(405);
+            echo json_encode(["error" => "Method not allowed"]);
+            break;
+        }
+        
+        $email = $input["email"] ?? "";
+        $password = $input["password"] ?? "";
+        
+        $stmt = $db->prepare("SELECT * FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($user && password_verify($password, $user["password"])) {
+            $token = bin2hex(random_bytes(32));
+            $expires = date("Y-m-d H:i:s", strtotime("+7 days"));
+            
+            $stmt = $db->prepare("INSERT INTO user_sessions (user_id, token, expires_at) VALUES (?, ?, ?)");
+            $stmt->execute([$user["id"], $token, $expires]);
+            
+            echo json_encode([
+                "success" => true,
+                "token" => $token,
+                "user" => [
+                    "id" => $user["id"],
+                    "email" => $user["email"],
+                    "username" => $user["username"],
+                    "credits" => $user["credits"]
+                ]
+            ]);
+        } else {
+            http_response_code(401);
+            echo json_encode(["error" => "Invalid credentials"]);
+        }
+        break;
+        
+    case "auth/register":
+        if ($method !== "POST") {
+            http_response_code(405);
+            echo json_encode(["error" => "Method not allowed"]);
+            break;
+        }
+        
+        $email = $input["email"] ?? "";
+        $username = $input["username"] ?? "";
+        $password = $input["password"] ?? "";
+        
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($password) < 8) {
+            http_response_code(400);
+            echo json_encode(["error" => "Invalid input"]);
+            break;
+        }
+        
+        try {
+            $hashed = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $db->prepare("INSERT INTO users (email, username, password) VALUES (?, ?, ?)");
+            $stmt->execute([$email, $username, $hashed]);
+            
+            echo json_encode([
+                "success" => true,
+                "message" => "Registration successful"
+            ]);
+        } catch (PDOException $e) {
+            http_response_code(409);
+            echo json_encode(["error" => "Email or username already exists"]);
+        }
+        break;
+        
+    default:
+        http_response_code(404);
+        echo json_encode(["error" => "Endpoint not found"]);
+}
+';
+    
+    file_put_contents('api/index.php', $api_router);
+    
+    // admin/index.php - Pannello admin base
+    $admin_panel = '<?php
+session_start();
+
+// Check if admin
+if (!isset($_SESSION["admin_id"])) {
+    header("Location: login.php");
+    exit;
+}
+
+require_once "../api/config.php";
+?>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Panel - ' . $CONFIG['brand_name'] . '</title>
+    <style>
+        body { font-family: Arial; margin: 0; background: #f5f5f5; }
+        .header { background: #667eea; color: white; padding: 20px; }
+        .container { padding: 20px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+        .stat-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .stat-value { font-size: 32px; font-weight: bold; color: #667eea; }
+        a { color: #667eea; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>' . $CONFIG['brand_emoji'] . ' ' . $CONFIG['brand_name'] . ' Admin</h1>
+        <a href="logout.php" style="color: white;">Logout</a>
+    </div>
+    <div class="container">
+        <h2>Dashboard</h2>
+        <div class="stats">
+            <div class="stat-card">
+                <div>Utenti Totali</div>
+                <div class="stat-value">0</div>
+            </div>
+            <div class="stat-card">
+                <div>Generazioni</div>
+                <div class="stat-value">0</div>
+            </div>
+            <div class="stat-card">
+                <div>Crediti Venduti</div>
+                <div class="stat-value">0</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>';
+    
+    file_put_contents('admin/index.php', $admin_panel);
+    
+    // admin/login.php
+    $admin_login = '<?php
+session_start();
+
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    require_once "../api/config.php";
+    
+    $email = $_POST["email"];
+    $password = $_POST["password"];
+    
+    try {
+        $db = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME, DB_USER, DB_PASS);
+        $stmt = $db->prepare("SELECT * FROM users WHERE email = ? AND role = \'admin\'");
+        $stmt->execute([$email]);
+        $admin = $stmt->fetch();
+        
+        if ($admin && password_verify($password, $admin["password"])) {
+            $_SESSION["admin_id"] = $admin["id"];
+            header("Location: index.php");
+            exit;
+        }
+    } catch (PDOException $e) {}
+}
+?>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Login - ' . $CONFIG['brand_name'] . '</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            width: 300px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        h2 { text-align: center; color: #333; }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <h2>' . $CONFIG['brand_emoji'] . ' Admin Login</h2>
+        <form method="POST">
+            <input type="email" name="email" placeholder="Email" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+    </div>
+</body>
+</html>';
+    
+    file_put_contents('admin/login.php', $admin_login);
+    
+    // admin/logout.php
+    file_put_contents('admin/logout.php', '<?php session_start(); session_destroy(); header("Location: login.php");');
+}
+?>
